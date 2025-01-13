@@ -1,33 +1,48 @@
 const mongoose = require("mongoose");
 
-const resultSchema = new mongoose.Schema(
-  {
-    userId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
-      required: true,
-    },
-    answers: [
-      {
-        questionId: { type: String, required: true }, // ID dari soal dalam array questions
-        userAnswer: { type: String, required: true }, // Jawaban yang dipilih oleh user
-        isCorrect: { type: Boolean, required: true }, // Menentukan apakah jawaban benar
-        score: { type: Number, required: true }, // Nilai yang diberikan untuk soal ini
-      },
-    ],
-    totalScore: { type: Number, default: 0 }, // Menyimpan total skor
+const ResultSchema = new mongoose.Schema({
+  exam: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "Question",
+    required: true,
   },
-  { timestamps: true }
-);
-
-// Middleware untuk menghitung totalScore sebelum menyimpan hasil
-resultSchema.pre("save", function (next) {
-  // Menghitung totalScore dari semua answers
-  this.totalScore = this.answers.reduce(
-    (total, answer) => total + answer.score,
-    0
-  );
-  next();
+  userId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "User",
+    required: true,
+  },
+  answers: [
+    {
+      questionId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Question",
+        required: true,
+      },
+      userAnswer: {
+        type: String,
+        required: true,
+      },
+      isCorrect: {
+        type: Boolean,
+        default: false,
+      },
+      score: {
+        type: Number,
+        default: 0,
+      },
+    },
+  ],
+  totalScore: {
+    type: Number,
+    default: 0,
+  },
+  createdAt: {
+    type: Date,
+    default: Date.now,
+  },
 });
 
-module.exports = mongoose.model("Result", resultSchema);
+// Pastikan nama model sesuai
+const Result = mongoose.model("Result", ResultSchema);
+
+module.exports = Result;

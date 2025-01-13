@@ -25,7 +25,15 @@ const getQuestionsByCode = async (req, res) => {
     if (!questionSet)
       return res.status(404).json({ message: "Question set not found" });
 
-    res.status(200).json(questionSet.questions); // Kirim array `questions` ke user
+    console.log(questionSet._id);
+
+    const examId = questionSet._id;
+    const questions = questionSet.questions;
+
+    res.status(200).json({
+      examId,
+      questions,
+    });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }

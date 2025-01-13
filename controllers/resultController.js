@@ -1,53 +1,94 @@
-const Result = require("../models/Result");
-const Question = require("../models/Question"); // Sesuaikan path sesuai struktur folder Anda
+const mongoose = require("mongoose");
+const Result = require("../models/Result"); // Sesuaikan path import
+const Question = require("../models/Question"); // Import juga model Question untuk validasi
 
 const submitAnswer = async (req, res) => {
   try {
-    const { userId, answers } = req.body;
+    const { exam, userId, answers } = req.body;
 
-    // Ambil pertanyaan yang relevan untuk soal yang dijawab oleh user
-    const questionIds = answers.map((answer) => answer.questionId);
-    const questions = await Question.find({
-      "questions.id": { $in: questionIds },
-    });
+    console.log("Received payload:", { exam, userId, answers }); // Log payload
 
+    // Validasi input
+    if (!exam || !userId || !answers || !Array.isArray(answers)) {
+      return res.status(400).json({
+        message: "Data input tidak valid",
+      });
+    }
+
+    // Validasi ObjectId
+    try {
+      new mongoose.Types.ObjectId(exam);
+      new mongoose.Types.ObjectId(userId);
+
+      answers.forEach((answer) => {
+        new mongoose.Types.ObjectId(answer.questionId);
+      });
+    } catch (idError) {
+      return res.status(400).json({
+        message: "ID tidak valid",
+        error: idError.message,
+      });
+    }
+
+    // Cek apakah ujian ada
+    const questionSet = await Question.findById(exam);
+    if (!questionSet) {
+      return res.status(404).json({
+        message: "Ujian tidak ditemukan",
+      });
+    }
+
+    // Proses jawaban dengan perhitungan skor
     const updatedAnswers = answers.map((answer) => {
-      // Temukan soal yang sesuai dengan questionId
-      const question = questions
-        .map((q) => q.questions.find((qs) => qs.id === answer.questionId))
-        .find((qs) => qs);
+      const question = questionSet.questions.find(
+        (q) => q._id.toString() === answer.questionId
+      );
 
       if (!question) {
-        throw new Error(`Soal dengan ID ${answer.questionId} tidak ditemukan.`);
+        throw new Error(`Soal dengan ID ${answer.questionId} tidak ditemukan`);
       }
 
-      // Periksa apakah jawaban yang dipilih benar
       const isCorrect = question.correctOption === answer.userAnswer;
-      const score = isCorrect ? question.score : 0;
+      const score = isCorrect ? question.score || 5 : 0;
 
       return {
-        questionId: answer.questionId,
+        questionId: new mongoose.Types.ObjectId(answer.questionId),
         userAnswer: answer.userAnswer,
         isCorrect: isCorrect,
         score: score,
       };
     });
 
-    // Buat result baru dengan jawaban yang telah diperiksa
+    // Hitung total skor
+    const totalScore = updatedAnswers.reduce(
+      (total, answer) => total + answer.score,
+      0
+    );
+
+    // Buat result baru
     const result = new Result({
-      userId,
+      exam: new mongoose.Types.ObjectId(exam),
+      userId: new mongoose.Types.ObjectId(userId),
       answers: updatedAnswers,
+      totalScore: totalScore,
     });
 
-    // Simpan result ke database
+    // Simpan result
     await result.save();
 
-    res.status(200).json({ message: "Hasil ujian berhasil disimpan", result });
+    res.status(200).json({
+      message: "Hasil ujian berhasil disimpan",
+      result: {
+        totalScore: result.totalScore,
+        isPassed: totalScore >= questionSet.questions.length * 5 * 0.6, // contoh passing grade 60%
+      },
+    });
   } catch (error) {
-    console.error(error);
+    console.error("Full Error:", error);
     res.status(500).json({
       message: "Terjadi kesalahan saat menyimpan hasil",
       error: error.message,
+      errorDetails: error.stack,
     });
   }
 };
