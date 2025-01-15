@@ -24,6 +24,7 @@ const questionSchema = new mongoose.Schema(
         questionId: {
           type: Number,
           unique: true,
+          default: 1,
         },
         question: {
           type: String,
